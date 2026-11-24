@@ -1,1 +1,303 @@
+name: Build GoldWatch APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+      - name: Create project
+        run: |
+          cat > settings.gradle.kts <<'XEOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "GoldWatch"
+          include(":app")
+          XEOF
+          cat > build.gradle.kts <<'XEOF'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          XEOF
+          cat > gradle.properties <<'XEOF'
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          kotlin.code.style=official
+          XEOF
+          mkdir -p app
+          cat > app/build.gradle.kts <<'XEOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
 
+          android {
+              namespace = "com.hamzah.goldwatch"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.hamzah.goldwatch"
+                  minSdk = 30
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                      signingConfig = signingConfigs.getByName("debug")
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          XEOF
+          mkdir -p app/src/main
+          cat > app/src/main/AndroidManifest.xml <<'XEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-feature android:name="android.hardware.type.watch" />
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+              <application
+                  android:label="Gold"
+                  android:icon="@drawable/ic_gold"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+                  <!-- Jalan sendiri tanpa perlu app di phone -->
+                  <meta-data
+                      android:name="com.google.android.wearable.standalone"
+                      android:value="true" />
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          XEOF
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_gold.xml <<'XEOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="48dp" android:height="48dp"
+              android:viewportWidth="48" android:viewportHeight="48">
+              <path android:fillColor="#111111" android:pathData="M24,0a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z"/>
+              <path android:fillColor="#E8B931" android:pathData="M10,32 L16,18 L32,18 L38,32 Z"/>
+              <path android:fillColor="#FFD966" android:pathData="M18,20 L30,20 L33,26 L15,26 Z"/>
+          </vector>
+          XEOF
+          mkdir -p app/src/main/res/layout
+          cat > app/src/main/res/layout/activity_main.xml <<'XEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/root"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#000000"
+              android:gravity="center"
+              android:orientation="vertical"
+              android:padding="24dp">
+
+              <TextView
+                  android:id="@+id/label"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="XAU/USD"
+                  android:textColor="#E8B931"
+                  android:textSize="14sp"
+                  android:textStyle="bold" />
+
+              <TextView
+                  android:id="@+id/price"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="4dp"
+                  android:text="----.--"
+                  android:textColor="#FFFFFF"
+                  android:textSize="36sp"
+                  android:textStyle="bold" />
+
+              <TextView
+                  android:id="@+id/change"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="2dp"
+                  android:text=""
+                  android:textColor="#AAAAAA"
+                  android:textSize="15sp" />
+
+              <TextView
+                  android:id="@+id/updated"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="10dp"
+                  android:text="Loading..."
+                  android:textColor="#777777"
+                  android:textSize="11sp" />
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="2dp"
+                  android:text="tap = refresh"
+                  android:textColor="#444444"
+                  android:textSize="10sp" />
+          </LinearLayout>
+          XEOF
+          mkdir -p app/src/main/java/com/hamzah/goldwatch
+          cat > app/src/main/java/com/hamzah/goldwatch/MainActivity.kt <<'XEOF'
+          package com.hamzah.goldwatch
+
+          import android.app.Activity
+          import android.graphics.Color
+          import android.os.Bundle
+          import android.os.Handler
+          import android.os.Looper
+          import android.view.WindowManager
+          import android.widget.TextView
+          import org.json.JSONObject
+          import java.net.HttpURLConnection
+          import java.net.URL
+          import java.text.SimpleDateFormat
+          import java.util.Date
+          import java.util.Locale
+          import java.util.TimeZone
+          import java.util.concurrent.Executors
+
+          class MainActivity : Activity() {
+
+              private val api = "https://api.gold-api.com/price/XAU"
+              private val refreshMs = 30_000L          // API update tiap 30s
+              private val io = Executors.newSingleThreadExecutor()
+              private val ui = Handler(Looper.getMainLooper())
+
+              private lateinit var tvPrice: TextView
+              private lateinit var tvChange: TextView
+              private lateinit var tvUpdated: TextView
+
+              private var sessionOpen: Double? = null   // harga pertama bila app dibuka
+              private var lastPrice: Double? = null
+
+              private val loop = object : Runnable {
+                  override fun run() {
+                      fetch()
+                      ui.postDelayed(this, refreshMs)
+                  }
+              }
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_main)
+                  tvPrice = findViewById(R.id.price)
+                  tvChange = findViewById(R.id.change)
+                  tvUpdated = findViewById(R.id.updated)
+                  findViewById<android.view.View>(R.id.root).setOnClickListener { fetch() }
+                  // Skrin kekal hidup selagi app dibuka (tutup app = biasa balik)
+                  window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  ui.post(loop)
+              }
+
+              override fun onPause() {
+                  super.onPause()
+                  ui.removeCallbacks(loop)              // jimat bateri bila tak tengok
+              }
+
+              override fun onDestroy() {
+                  super.onDestroy()
+                  io.shutdownNow()
+              }
+
+              private fun fetch() {
+                  io.execute {
+                      try {
+                          val conn = (URL(api).openConnection() as HttpURLConnection).apply {
+                              connectTimeout = 8000
+                              readTimeout = 8000
+                              setRequestProperty("Accept", "application/json")
+                          }
+                          val body = conn.inputStream.bufferedReader().use { it.readText() }
+                          conn.disconnect()
+                          val json = JSONObject(body)
+                          val price = json.getDouble("price")
+                          val updatedAt = json.optString("updatedAt", "")
+                          ui.post { show(price, updatedAt) }
+                      } catch (e: Exception) {
+                          ui.post {
+                              tvUpdated.text = "No connection - retry 30s"
+                              tvUpdated.setTextColor(Color.parseColor("#FF6B6B"))
+                          }
+                      }
+                  }
+              }
+
+              private fun show(price: Double, updatedAt: String) {
+                  if (sessionOpen == null) sessionOpen = price
+                  val prev = lastPrice
+                  lastPrice = price
+
+                  tvPrice.text = String.format(Locale.US, "%.2f", price)
+                  tvPrice.setTextColor(
+                      when {
+                          prev == null || price == prev -> Color.WHITE
+                          price > prev -> Color.parseColor("#4CD964")
+                          else -> Color.parseColor("#FF6B6B")
+                      }
+                  )
+
+                  val diff = price - (sessionOpen ?: price)
+                  val arrow = if (diff > 0) "▲" else if (diff < 0) "▼" else "•"
+                  tvChange.text = String.format(Locale.US, "%s %+.2f", arrow, diff)
+                  tvChange.setTextColor(
+                      if (diff > 0) Color.parseColor("#4CD964")
+                      else if (diff < 0) Color.parseColor("#FF6B6B")
+                      else Color.parseColor("#AAAAAA")
+                  )
+
+                  tvUpdated.setTextColor(Color.parseColor("#777777"))
+                  tvUpdated.text = "Update " + toMyt(updatedAt) + " MYT"
+              }
+
+              private fun toMyt(iso: String): String = try {
+                  val inFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                      .apply { timeZone = TimeZone.getTimeZone("UTC") }
+                  val d: Date = inFmt.parse(iso.take(19))!!
+                  SimpleDateFormat("HH:mm:ss", Locale.US)
+                      .apply { timeZone = TimeZone.getTimeZone("Asia/Kuala_Lumpur") }
+                      .format(d)
+              } catch (e: Exception) {
+                  SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+              }
+          }
+          XEOF
+      - name: Build
+        run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GoldWatch-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
