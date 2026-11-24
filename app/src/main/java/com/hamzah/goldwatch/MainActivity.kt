@@ -20,7 +20,7 @@ import java.util.concurrent.Executors
 class MainActivity : Activity() {
 
     private val spotApi = "https://api.gold-api.com/price/XAU"
-    private fun candleApi(tf: Int) = "https://api.kraken.com/0/public/OHLC?pair=PAXGUSD&interval=$tf"
+    private fun candleApi(tf: Int) = "https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=${tf}m&limit=40"
 
     private val refreshMs = 30_000L
     private val io = Executors.newFixedThreadPool(2)
@@ -89,7 +89,7 @@ class MainActivity : Activity() {
         val c = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 8000; readTimeout = 8000
             setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "GoldWatch/2.0")
+            setRequestProperty("User-Agent", "GoldWatch/3.0")
         }
         return try { c.inputStream.bufferedReader().use { it.readText() } } finally { c.disconnect() }
     }
@@ -102,7 +102,7 @@ class MainActivity : Activity() {
                 val at = j.optString("updatedAt", "")
                 ui.post { showSpot(p, at) }
             } catch (e: Exception) {
-                ui.post { tvUpdated.text = "No connection - retry 30s"; tvUpdated.setTextColor(Color.parseColor("#FF6B6B")) }
+                ui.post { tvUpdated.text = "No connection - retry 30s"; tvUpdated.setTextColor(Color.parseColor("#EF5350")) }
             }
         }
     }
@@ -111,14 +111,11 @@ class MainActivity : Activity() {
         val want = tf
         io.execute {
             try {
-                val j = JSONObject(get(candleApi(want)))
-                val res = j.getJSONObject("result")
-                val key = res.keys().asSequence().first { it != "last" }
-                val arr = res.getJSONArray(key)
+                val arr = org.json.JSONArray(get(candleApi(want)))
                 val list = ArrayList<Candle>(arr.length())
                 for (i in 0 until arr.length()) {
                     val r = arr.getJSONArray(i)
-                    list.add(Candle(r.getLong(0), r.getString(1).toDouble(), r.getString(2).toDouble(),
+                    list.add(Candle(r.getLong(0) / 1000, r.getString(1).toDouble(), r.getString(2).toDouble(),
                         r.getString(3).toDouble(), r.getString(4).toDouble()))
                 }
                 ui.post { if (want == tf) chart.setCandles(list) }
@@ -132,16 +129,16 @@ class MainActivity : Activity() {
         tvPrice.text = String.format(Locale.US, "%.2f", price)
         tvPrice.setTextColor(when {
             prev == null || price == prev -> Color.WHITE
-            price > prev -> Color.parseColor("#4CD964")
-            else -> Color.parseColor("#FF6B6B")
+            price > prev -> Color.parseColor("#26A69A")
+            else -> Color.parseColor("#EF5350")
         })
         if (prev != null && price != prev) {
             val d = price - prev
             tvChange.text = String.format(Locale.US, "%s%.2f", if (d > 0) "▲" else "▼", kotlin.math.abs(d))
-            tvChange.setTextColor(if (d > 0) Color.parseColor("#4CD964") else Color.parseColor("#FF6B6B"))
+            tvChange.setTextColor(if (d > 0) Color.parseColor("#26A69A") else Color.parseColor("#EF5350"))
         }
         tvUpdated.setTextColor(Color.parseColor("#666666"))
-        tvUpdated.text = "XAU " + toMyt(at) + " MYT · chart PAXG"
+        tvUpdated.text = "XAU " + toMyt(at) + " MYT · chart PAXG Binance"
     }
 
     private fun toMyt(iso: String): String = try {

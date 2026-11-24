@@ -21,20 +21,20 @@ class CandleView @JvmOverloads constructor(
     private var livePrice: Double? = null
     private val maxBars = 30
 
-    private val up = Color.parseColor("#4CD964")
-    private val down = Color.parseColor("#FF5A5A")
+    private val up = Color.parseColor("#26A69A")
+    private val down = Color.parseColor("#EF5350")
     private val gold = Color.parseColor("#E8B931")
     private val dp = resources.displayMetrics.density
 
     private val body = Paint(Paint.ANTI_ALIAS_FLAG)
     private val wick = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 1.2f * dp }
-    private val grid = Paint().apply { color = Color.parseColor("#222222"); strokeWidth = 1f }
+    private val grid = Paint().apply { color = Color.parseColor("#2A2E39"); strokeWidth = 1f }
     private val lastLine = Paint().apply {
         color = gold; strokeWidth = 1f * dp
         pathEffect = DashPathEffect(floatArrayOf(4 * dp, 3 * dp), 0f)
     }
     private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#888888"); textSize = 8.5f * dp; textAlign = Paint.Align.RIGHT
+        color = Color.parseColor("#B2B5BE"); textSize = 8.5f * dp; textAlign = Paint.Align.RIGHT
     }
     private val tag = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK; textSize = 9f * dp; textAlign = Paint.Align.RIGHT
@@ -63,6 +63,8 @@ class CandleView @JvmOverloads constructor(
         fun y(p: Double) = (h - (p - lo) / (hi - lo) * h).toFloat()
 
         // grid + label 3 aras
+        // grid menegak
+        for (i in 1..3) { val xx = plotW * i / 4f; cv.drawLine(xx, 0f, xx, h, grid) }
         for (i in 0..2) {
             val p = lo + (hi - lo) * (0.15 + 0.35 * i)
             val yy = y(p)
@@ -85,6 +87,8 @@ class CandleView @JvmOverloads constructor(
 
         // garisan harga terkini + tag
         val ly = y(last)
+        val lc = if (candles.last().c >= candles.last().o) up else down
+        lastLine.color = lc; tagBg.color = lc; tag.color = Color.WHITE
         cv.drawLine(0f, ly, plotW, ly, lastLine)
         val txt = String.format(Locale.US, "%.1f", last)
         val tw = tag.measureText(txt) + 4 * dp
